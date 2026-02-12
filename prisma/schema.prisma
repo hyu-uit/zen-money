@@ -5,10 +5,131 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum AccountType {
+  BANK
+  WALLET
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  createdAt DateTime @default(now())
+
+  accounts     PhysicalAccount[]
+  fiscalCycles FiscalCycle[]
+  investments  InvestmentAsset[]
+}
+
+model PhysicalAccount {
+  id        String      @id @default(uuid())
+  name      String
+  type      AccountType
+  balance   Decimal     @default(0) @db.Decimal(15, 2)
+  createdAt DateTime    @default(now())
+
+  funds          Fund[]
+  transactions   Transaction[] @relation("FromAccount")
+  toTransactions Transaction[] @relation("ToAccount")
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Fund {
+  id         String   @id @default(uuid())
+  name       String
+  percentage Decimal  @default(0) @db.Decimal(5, 2)
+  balance    Decimal  @default(0) @db.Decimal(15, 2)
+  createdAt  DateTime @default(now())
+
+  transactions Transaction[]
+
+  defaultAccountId String
+  defaultAccount   PhysicalAccount @relation(fields: [defaultAccountId], references: [id])
+}
+
+model FiscalCycle {
+  id           String   @id @default(uuid())
+  startDate    DateTime
+  endDate      DateTime
+  salaryAmount Decimal  @default(0) @db.Decimal(15, 2)
+  createdAt    DateTime @default(now())
+
+  transactions Transaction[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Transaction {
+  id              String          @id @default(uuid())
+  type            TransactionType
+  amount          Decimal         @db.Decimal(15, 2)
+  description     String?
+  transactionDate DateTime
+  createdAt       DateTime        @default(now())
+
+  fundId String?
+  fund   Fund?   @relation(fields: [fundId], references: [id])
+
+  accountId String
+  account   PhysicalAccount @relation("FromAccount", fields: [accountId], references: [id])
+
+  toAccountId String?
+  toAccount   PhysicalAccount? @relation("ToAccount", fields: [toAccountId], references: [id])
+
+  fiscalCycleId String
+  fiscalCycle   FiscalCycle @relation(fields: [fiscalCycleId], references: [id])
+}
+
+model InvestmentAsset {
+  id            String   @id @default(uuid())
+  ticker        String
+  totalQuantity Int
+  createdAt     DateTime @default(now())
+
+  transactions InvestmentTransaction[]
+  snapshots    InvestmentSnapshot[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, ticker])
+}
+
+model InvestmentTransaction {
+  id              String   @id @default(uuid())
+  quantity        Int
+  price           Decimal  @db.Decimal(15, 2)
+  totalAmount     Decimal  @db.Decimal(15, 2)
+  transactionDate DateTime
+  createdAt       DateTime @default(now())
+
+  assetId String
+  asset   InvestmentAsset @relation(fields: [assetId], references: [id])
+}
+
+model InvestmentSnapshot {
+  id           String   @id @default(uuid())
+  marketPrice  Decimal  @db.Decimal(15, 2)
+  snapshotDate DateTime
+  createdAt    DateTime @default(now())
+
+  assetId String
+  asset   InvestmentAsset @relation(fields: [assetId], references: [id])
 }
